@@ -18,22 +18,26 @@ Published reference (official runtime): best ≈ **48.45** (Gemini-3.1-Pro), GPT
 
 ## What's in this skill
 
-| File | Run by | Purpose |
-|------|--------|---------|
-| `SKILL.md` | the agent | The rules + the turn-by-turn loop the agent follows on itself. |
-| `scripts/prepare_dataset.py` | operator | Splits a downloaded dataset into an answer-stripped agent **manifest** + held-out **gold**. Does not download. |
-| `scripts/pysession.py` | the agent | One persistent IPython session per task (continuous state across steps & turns). |
-| `scripts/judge.py` | operator | Official binary LLM-judge (verbatim `JUDGE_PROMPT`); reports accuracy overall + per domain. |
+| File                         | Run by    | Purpose                                                                                                        |
+| ---------------------------- | --------- | -------------------------------------------------------------------------------------------------------------- |
+| `SKILL.md`                   | the agent | The rules + the turn-by-turn loop the agent follows on itself.                                                 |
+| `scripts/prepare_dataset.py` | operator  | Splits a downloaded dataset into an answer-stripped agent **manifest** + held-out **gold**. Does not download. |
+| `scripts/pysession.py`       | the agent | One persistent IPython session per task (continuous state across steps & turns).                               |
+| `scripts/judge.py`           | operator  | Official binary LLM-judge (verbatim `JUDGE_PROMPT`); reports accuracy overall + per domain.                    |
 
 ---
 
 ## Setup (operator, once)
 
-Pick a working area and some shared env vars:
+Clone this repository and pick a working area. The repository directory itself is
+`SKILL_DIR`; you do not need to install or register it as a named skill.
 
 ```bash
-export SKILL_DIR="$HOME/.anda/skills/longds-bench"   # wherever this skill is installed
-export WORK="$HOME/longds-bench"
+mkdir -p "$HOME/github"
+git clone https://github.com/ldclabs/longds-bench.git "$HOME/github/longds-bench"
+
+export SKILL_DIR="$HOME/github/longds-bench"          # directory containing SKILL.md + scripts/
+export WORK="$HOME/longds-bench-work"
 export STAGING="$WORK/dataset"                        # raw download (~19.5 GB)
 export LONGDS_RUN="$WORK/run"                          # prepared workspace the agent uses
 export LONGDS_VENV="$WORK/venv"
@@ -97,9 +101,16 @@ $LONGDS_RUN/
 
 ## Run the agent on it
 
-Tell your agent to use the `longds-bench` skill, pointing it at the prepared workspace, e.g.:
+Tell your agent to read and follow `SKILL.md` from this repository, pointing it
+at the prepared workspace. No `longds-bench` skill installation is required.
+For example:
 
-> Run the **longds-bench** skill on yourself. `SKILL_DIR=…`, `LONGDS_RUN=…`, `LONGDS_VENV=…`. Start with the one-task pilot, show me the score, then ask before the full run.
+> `SKILL_DIR=/path/to/longds-bench`, `LONGDS_RUN=/path/to/run`, `LONGDS_VENV=/path/to/venv`. Please follow `/path/to/longds-bench/SKILL.md` to run the LongDS-Bench tasks on yourself. Start with the one-task pilot, show me the score, then ask before the full run.
+
+If you only need the agent to answer tasks and do not want it to score the run
+immediately, say that explicitly:
+
+> `SKILL_DIR=/path/to/longds-bench`, `LONGDS_RUN=/path/to/run`, `LONGDS_VENV=/path/to/venv`. Please follow `/path/to/longds-bench/SKILL.md` to run the test tasks with your highest reasoning effort. Only answer the tasks; do not evaluate the score. To save time, run 3-5 tasks concurrently.
 
 The agent then follows `SKILL.md`: for each task it opens a persistent Python session at the task's `data_dir`, solves each turn in order with continuous code execution (no plotting; exact numeric answers), and appends its final answer per turn to `answers/<key>.json`. **Integrity:** the agent must read only `manifest/`, never `gold/` or the raw `task.json`.
 
@@ -111,10 +122,10 @@ Use a judge endpoint (OpenAI-compatible). **Use a judge model different from the
 
 ```bash
 . "$LONGDS_VENV/bin/activate"
-export JUDGE_API_KEY="<key>"; export JUDGE_BASE_URL="<base_url>"
+export JUDGE_API_KEY="<key>"; export JUDGE_BASE_URL="https://api.deepseek.com"
 python "$SKILL_DIR/scripts/judge.py" \
   --answers "$LONGDS_RUN/answers" --gold "$LONGDS_RUN/gold" \
-  --out "$LONGDS_RUN/results_eval.json" --judge-model "<model>" --max-workers 8
+  --out "$LONGDS_RUN/results_eval.json" --judge-model "deepseek-v4-pro" --max-workers 8
 ```
 
 Output (`results_eval.json` + console): overall accuracy, per-domain accuracy, per-task accuracy, and the per-turn scores/reasoning. Turns with an empty answer score 0; turns the judge can't parse after 3 retries are excluded and reported as unjudged.
@@ -126,23 +137,6 @@ Output (`results_eval.json` + console): overall accuracy, per-domain accuracy, p
 - **Indicative, not official.** Local venv ≠ DSGym's pinned Docker image; the agent's own loop ≠ the benchmark's fixed ReAct scaffold. Report the number as the agent's ability, not a leaderboard score.
 - **Judge bias.** Self-judging inflates scores; prefer a separate judge model and say which you used.
 - **Cost/time.** Full run = thousands of paid steps + 2,225 judge calls. Always pilot first.
-
-## Installing the skill
-
-This repository *is* the Agent Skill (`SKILL.md` + `scripts/` at the root). Clone it and point your harness at it:
-
-```bash
-git clone https://github.com/ldclabs/longds-bench.git
-```
-
-For **Anda Bot**, copy it into the skills directory and reload:
-
-```bash
-cp -R longds-bench "$HOME/.anda/skills/longds-bench"
-anda models reload   # or restart the daemon to rescan skills
-```
-
-Other harnesses: place the folder wherever they load Agent Skills from; only `SKILL.md` and `scripts/` are required.
 
 ## Credits & licensing
 

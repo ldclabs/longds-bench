@@ -18,22 +18,25 @@
 
 ## 本 skill 包含什么
 
-| 文件 | 由谁运行 | 用途 |
-|------|---------|------|
-| `SKILL.md` | 智能体 | 规则 + 智能体对自身执行的逐轮循环。 |
-| `scripts/prepare_dataset.py` | 操作者 | 把已下载的数据集拆分为「剥离答案的智能体 **manifest**」+「留存的 **gold**」。**不下载**。 |
-| `scripts/pysession.py` | 智能体 | 每个任务一个持久 IPython 会话（跨步、跨轮保持状态）。 |
-| `scripts/judge.py` | 操作者 | 官方二元 LLM-judge（逐字复用 `JUDGE_PROMPT`）；报告总体与各领域准确率。 |
+| 文件                         | 由谁运行 | 用途                                                                                      |
+| ---------------------------- | -------- | ----------------------------------------------------------------------------------------- |
+| `SKILL.md`                   | 智能体   | 规则 + 智能体对自身执行的逐轮循环。                                                       |
+| `scripts/prepare_dataset.py` | 操作者   | 把已下载的数据集拆分为「剥离答案的智能体 **manifest**」+「留存的 **gold**」。**不下载**。 |
+| `scripts/pysession.py`       | 智能体   | 每个任务一个持久 IPython 会话（跨步、跨轮保持状态）。                                     |
+| `scripts/judge.py`           | 操作者   | 官方二元 LLM-judge（逐字复用 `JUDGE_PROMPT`）；报告总体与各领域准确率。                   |
 
 ---
 
 ## 准备（操作者，一次性）
 
-选一个工作目录并设置若干共享环境变量：
+克隆本仓库并选择一个工作目录。本仓库目录本身就是 `SKILL_DIR`；不需要把它安装或注册成某个具名 skill。
 
 ```bash
-export SKILL_DIR="$HOME/.anda/skills/longds-bench"   # 本 skill 的安装位置
-export WORK="$HOME/longds-bench"
+mkdir -p "$HOME/github"
+git clone https://github.com/ldclabs/longds-bench.git "$HOME/github/longds-bench"
+
+export SKILL_DIR="$HOME/github/longds-bench"          # 包含 SKILL.md + scripts/ 的目录
+export WORK="$HOME/longds-bench-work"
 export STAGING="$WORK/dataset"                        # 原始下载（约 19.5 GB）
 export LONGDS_RUN="$WORK/run"                          # 智能体使用的预处理工作区
 export LONGDS_VENV="$WORK/venv"
@@ -97,9 +100,13 @@ $LONGDS_RUN/
 
 ## 让智能体来跑
 
-让你的智能体使用 `longds-bench` 这个 skill，并把预处理工作区指给它，例如：
+让你的智能体读取并遵循本仓库里的 `SKILL.md`，并把预处理工作区指给它。不需要安装 `longds-bench` skill。例如：
 
-> 对你自己运行 **longds-bench** 这个 skill。`SKILL_DIR=…`、`LONGDS_RUN=…`、`LONGDS_VENV=…`。先跑单任务试点，把分数给我看，然后在全量运行前先问我。
+> `SKILL_DIR=/path/to/longds-bench`，`LONGDS_RUN=/path/to/run`，`LONGDS_VENV=/path/to/venv`。请按照 `/path/to/longds-bench/SKILL.md` 的指示运行 LongDS-Bench 测试任务。先跑单任务试点，把分数给我看，然后在全量运行前先问我。
+
+如果只需要让智能体答题、不需要当场评估分数，也可以明确写成：
+
+> `SKILL_DIR=/path/to/longds-bench`，`LONGDS_RUN=/path/to/run`，`LONGDS_VENV=/path/to/venv`。请按照 `/path/to/longds-bench/SKILL.md` 的指示运行测试，使用最高推理能力获得最好结果。你只需要答题，不需要评估分数。为了节省时间，可并发运行 3～5 个任务。
 
 随后智能体按 `SKILL.md` 执行：对每个任务，在该任务的 `data_dir` 处打开一个持久 Python 会话，按 `turn_id` 顺序逐轮以连续代码执行求解（不画图；数值答案要精确），并把每一轮的最终答案追加写入 `answers/<key>.json`。**诚信约束：** 智能体只能读 `manifest/`，绝不能读 `gold/` 或原始 `task.json`。
 
@@ -111,10 +118,10 @@ $LONGDS_RUN/
 
 ```bash
 . "$LONGDS_VENV/bin/activate"
-export JUDGE_API_KEY="<key>"; export JUDGE_BASE_URL="<base_url>"
+export JUDGE_API_KEY="<key>"; export JUDGE_BASE_URL="https://api.deepseek.com"
 python "$SKILL_DIR/scripts/judge.py" \
   --answers "$LONGDS_RUN/answers" --gold "$LONGDS_RUN/gold" \
-  --out "$LONGDS_RUN/results_eval.json" --judge-model "<model>" --max-workers 8
+  --out "$LONGDS_RUN/results_eval.json" --judge-model "deepseek-v4-pro" --max-workers 8
 ```
 
 输出（`results_eval.json` + 控制台）：总体准确率、各领域准确率、各任务准确率，以及逐轮的分数/理由。空答案的轮计 0；judge 重试 3 次仍无法解析的轮会被排除并报告为「未判分」。
@@ -126,23 +133,6 @@ python "$SKILL_DIR/scripts/judge.py" \
 - **仅供参考，非官方。** 本地 venv ≠ DSGym 固定的 Docker 镜像；智能体自己的循环 ≠ 基准固定的 ReAct 脚手架。把分数当作该智能体能力的指示值，而非排行榜分数。
 - **Judge 偏差。** 自评会抬高分数；优先用独立的 judge 模型，并注明用的是哪个。
 - **成本/耗时。** 全量 = 数千个付费步骤 + 2,225 次 judge 调用。务必先试点。
-
-## 安装本 skill
-
-本仓库**本身**就是一个 Agent Skill（根目录下的 `SKILL.md` + `scripts/`）。克隆它并让你的 harness 指向它：
-
-```bash
-git clone https://github.com/ldclabs/longds-bench.git
-```
-
-对于 **Anda Bot**，把它复制进 skills 目录并重新加载：
-
-```bash
-cp -R longds-bench "$HOME/.anda/skills/longds-bench"
-anda models reload   # 或重启 daemon 以重新扫描 skills
-```
-
-其他 harness：把该文件夹放到它们加载 Agent Skills 的位置即可；只需 `SKILL.md` 和 `scripts/`。
 
 ## 鸣谢与许可
 

@@ -79,9 +79,9 @@ A full run is large. Prefer, in order of what your harness supports:
 After answers exist, run the official judge (separate judge endpoint via `JUDGE_API_KEY` / `JUDGE_BASE_URL`; default model `deepseek-v4-pro`):
 
 ```bash
-export JUDGE_API_KEY="<key>"; export JUDGE_BASE_URL="<base_url>"
+export JUDGE_API_KEY="<key>"; export JUDGE_BASE_URL="https://api.deepseek.com"
 python "$SKILL_DIR/scripts/judge.py" --answers "$RUN/answers" --gold "$RUN/gold" \
-  --out "$RUN/results_eval.json" --judge-model "<model>" --max-workers 8
+  --out "$RUN/results_eval.json" --judge-model "deepseek-v4-pro" --max-workers 8
 ```
 
 `judge.py` joins answers↔gold by `turn_id`, scores each turn 0/1 with the verbatim `JUDGE_PROMPT`, and prints overall accuracy + per-domain accuracy. Report those to the user against the paper's numbers.
