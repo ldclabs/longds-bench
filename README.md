@@ -4,7 +4,7 @@
 
 A portable, **agent-agnostic** skill for running **LongDS-Bench** ([zjunlp/DataMind](https://github.com/zjunlp/DataMind/tree/main/longds)) — the long-horizon, multi-turn agentic data-analysis benchmark — **with the agent itself as the runtime under test**.
 
-Unlike the official harness, this skill does **not** use DSGym's ~12 GB Docker executor and does **not** drive a model through LiteLLM. Instead, the agent that loads this skill *is* the thing being measured: it reads the dataset, does the multi-turn analysis with its own tools and a persistent Python session, answers each turn, and is then scored by the official LLM-judge rule. Any harness with a shell / code-execution tool (Anda Bot, or others) can use it.
+Unlike the official harness, this skill does **not** use DSGym's ~12 GB Docker executor and does **not** drive a model through LiteLLM. Instead, the agent that loads this skill *is* the thing being measured: it reads the dataset, does the multi-turn analysis with its own tools and a persistent Python session, answers each turn, and is then scored by the official LLM-judge rule. Any harness with a shell / code-execution tool ([AndaBot](https://github.com/ldclabs/anda-bot), or others) can use it.
 
 > **Heads up:** the LongDS dataset is **~19.5 GB**. You download and prepare it **once** as the operator; the agent never downloads anything. Scores from this setup are *indicative*, **not** officially leaderboard-comparable (different execution environment + agent scaffold than the paper).
 
@@ -15,6 +15,22 @@ Unlike the official harness, this skill does **not** use DSGym's ~12 GB Docker e
 68 tasks / 2,225 turns across six domains (Business, Community, Education, Geoscience, Social Good, Sports). Each task is one continuous multi-turn conversation in which analytical state evolves (state inheritance, update, counterfactual perturbation, rollback, multi-state composition). Each turn is judged **0/1**; the mean over all turns is the accuracy.
 
 Published reference (official runtime): best ≈ **48.45** (Gemini-3.1-Pro), GPT-5.4 **43.50**, Claude-4.6-Sonnet **41.56**.
+
+## Example self-run: AndaBot + GPT-5.5
+
+[AndaBot](https://github.com/ldclabs/anda-bot) completed a full LongDS-Bench answer run with GPT-5.5 in a little over **7 hours**. All **2,225 / 2,225** turns were judged, with **39.37%** overall accuracy:
+
+| Domain | Accuracy | Judged turns |
+| ------ | -------: | -----------: |
+| Overall | **0.3937** | 2,225 |
+| business | 0.5766 | 411 |
+| community | 0.6821 | 475 |
+| education | 0.8889 | 216 |
+| geoscience | 0.1814 | 678 |
+| social_good | 0.0000 | 336 |
+| sports | 0.0000 | 109 |
+
+This result is not an official leaderboard number, but it is a useful systems result: AndaBot can run the whole benchmark through this `SKILL.md`, maintain the answer-file contract across thousands of turns, and produce fully judgeable output. The sharp domain spread also shows what LongDS-Bench is good at exposing: real accuracy requires per-task computation discipline, not just schema-complete answers.
 
 ## What's in this skill
 
